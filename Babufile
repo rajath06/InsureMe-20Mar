@@ -1,66 +1,49 @@
 pipeline {
-    agent any
-    tools {
-        maven 'Maven_3.8.1' // Ensure this matches the Maven installation name in Jenkins
-    }
-    environment {
-        DOCKER_IMAGE = 'cbabu85/insure-me-app:4.0'
-    }
-    stages {
-        stage('Clone Repository') {
-            steps {
-                echo 'Cloning the Git repository...'
-                git branch: 'main', url: 'https://github.com/rajath06/InsureMe-20Mar.git'
+  agent any
+    tools{
+      maven 'M2_HOME'
+          }
+   stages {
+    stage('Git checkout') {
+      steps {
+         echo 'This is for cloning the gitrepo'
+         git branch: 'main', url: 'https://github.com/cbabu85/InsureMe-20Mar.git'
+                          }
             }
-        }
-        stage('Build with Maven') {
-            steps {
-                echo 'Building the application with Maven...'
-                sh 'mvn clean package'
+    stage('Create a Package') {
+      steps {
+         echo 'This will create a package using maven'
+         sh 'mvn package'
+                             }
             }
-        }
-        stage('Publish Test Reports') {
-            steps {
-                echo 'Publishing test reports...'
-                publishHTML([
-                    reportDir: 'target/surefire-reports',
-                    reportFiles: 'index.html',
-                    reportName: 'Test Report'
-                ])
+
+    stage('Publish the HTML Reports') {
+      steps {
+          publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: '/var/lib/jenkins/workspace/Insure-Project/target/surefire-reports', reportFiles: 'index.html', reportName: 'HTML Report', reportTitles: '', useWrapperFileDirectly: true])
+                        }
             }
-        }
-        stage('Build Docker Image') {
-            steps {
-                echo 'Building Docker image...'
-                sh "docker build -t ${DOCKER_IMAGE} ."
+    stage('Create a Docker image from the Package Insure-Me.jar file') {
+      steps {
+        sh 'docker build -t cbabu85/insure-me-app:4.0 .'
+                    }
             }
-        }
-        stage('Push Docker Image') {
-            steps {
-                echo 'Pushing Docker image to Docker Hub...'
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
-                    sh 'echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin'
-                    sh "docker push ${DOCKER_IMAGE}"
-                }
+    stage('Login to Dockerhub') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'dockerlogin', passwordVariable: 'dockerpass', usernameVariable: 'dockeruser')]) {
+        sh 'docker login -u ${dockeruser} -p ${dockerpass}'
+                                                                    }
+                                }
             }
-        }
-        stage('Deploy with Ansible') {
-            steps {
-                echo 'Deploying application using Ansible...'
-                ansiblePlaybook(
-                    playbook: 'ansible/deploy.yml',
-                    inventory: 'ansible/hosts',
-                    credentialsId: 'ansible-ssh-key'
-                )
+    stage('Push the Docker image') {
+      steps {
+        sh 'docker push cbabu85/insure-me-app:4.0'
+                                }
             }
-        }
-    }
-    post {
-        success {
-            echo 'Pipeline executed successfully!'
-        }
-        failure {
-            echo 'Pipeline execution failed.'
-        }
+    stage('Ansbile config and Deployment') {
+      steps {
+        ansiblePlaybook credentialsId: 'ansible-ssh', disableHostKeyChecking: true, installation: 'ansible', inventory: '/etc/ansible/hosts', playbook: 'ansible.yml', vaultTmpPath: ''
+                               }
+            }
+
     }
 }
