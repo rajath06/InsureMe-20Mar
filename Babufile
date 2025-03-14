@@ -1,51 +1,66 @@
 pipeline {
     agent any
     tools {
-        maven 'maven'  // Ensure this matches the Maven name in Jenkins
+        maven 'Maven_3.8.1' // Ensure this matches the Maven installation name in Jenkins
+    }
+    environment {
+        DOCKER_IMAGE = 'cbabu85/insure-me-app:4.0'
     }
     stages {
-        stage('Git checkout') {
+        stage('Clone Repository') {
             steps {
-                echo 'This is for cloning the gitrepo'
-                git branch: 'main', url: 'https://github.com/rajath06/InsureMe-20Mar.git'
+                echo 'Cloning the Git repository...'
+                git branch: 'main', url: 'https://github.com/cbabu85/InsureMe-20Mar.git'
             }
         }
-        stage('Create a Package') {
+        stage('Build with Maven') {
             steps {
-                echo 'This will create a package using Maven'
+                echo 'Building the application with Maven...'
                 sh 'mvn clean package'
             }
         }
-        stage('Publish the HTML Reports') {
+        stage('Publish Test Reports') {
             steps {
+                echo 'Publishing test reports...'
                 publishHTML([
                     reportDir: 'target/surefire-reports',
                     reportFiles: 'index.html',
-                    reportName: 'HTML Report'
+                    reportName: 'Test Report'
                 ])
             }
         }
-        stage('Create a Docker image from the Package Insure-Me.jar file') {
+        stage('Build Docker Image') {
             steps {
-                sh 'docker build -t rajath06/insure-me-app:4.0 .'
+                echo 'Building Docker image...'
+                sh "docker build -t ${DOCKER_IMAGE} ."
             }
         }
-        stage('Login to Dockerhub') {
+        stage('Push Docker Image') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerlogin', passwordVariable: 'dockerpass', usernameVariable: 'dockeruser')]) {
-                    sh 'docker login -u ${dockeruser} -p ${dockerpass}'
+                echo 'Pushing Docker image to Docker Hub...'
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+                    sh 'echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin'
+                    sh "docker push ${DOCKER_IMAGE}"
                 }
             }
         }
-        stage('Push the Docker image') {
+        stage('Deploy with Ansible') {
             steps {
-                sh 'docker push rajath06/insure-me-app:4.0'
+                echo 'Deploying application using Ansible...'
+                ansiblePlaybook(
+                    playbook: 'ansible/deploy.yml',
+                    inventory: 'ansible/hosts',
+                    credentialsId: 'ansible-ssh-key'
+                )
             }
         }
-        stage('Ansible Config and Deployment') {
-            steps {
-                ansiblePlaybook credentialsId: 'ansible-ssh', installation: 'ansible', inventory: '/etc/ansible/hosts', playbook: 'ansible.yml'
-            }
+    }
+    post {
+        success {
+            echo 'Pipeline executed successfully!'
+        }
+        failure {
+            echo 'Pipeline execution failed.'
         }
     }
 }
