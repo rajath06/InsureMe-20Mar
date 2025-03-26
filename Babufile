@@ -32,7 +32,7 @@ pipeline {
 
     stage('Create a Docker Image') {
       steps {
-        sh 'docker build -t rajath06/insure-me-app:4.0 .'
+        sh 'docker build -t rajath06/insure-me1-app:4.0 .'
       }
     }
 
@@ -46,7 +46,7 @@ pipeline {
 
     stage('Push the Docker Image') {
       steps {
-        sh 'docker push rajath06/insure-me-app:4.0'
+        sh 'docker push rajath06/insure-me1-app:4.0'
       }
     }
 
