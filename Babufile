@@ -9,7 +9,7 @@ pipeline {
   stages {  
     stage('Install Maven') {
       steps {
-        sh 'sudo apt update && sudo apt install -y maven'
+        sh 'apt update && apt install maven -y'
         sh 'mvn -version'
       }
     }
